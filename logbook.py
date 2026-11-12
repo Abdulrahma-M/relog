@@ -13,7 +13,6 @@ from dateutil.parser import parse
 import sqlite3
 import markdown
 import os
-now = dt.datetime.now
 
 
 app = Flask(__name__, static_folder='static', template_folder="pub")
@@ -46,8 +45,8 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS log_{sec} (
                     num       INTEGER PRIMARY KEY AUTOINCREMENT,
                     authors   TEXT       NOT NULL,
-                    date      TEXT       DEFAULT (datetime('now')),
-                    submit    TEXT       DEFAULT (datetime('now')),
+                    date      INT        DEFAULT (unixepoch('now')),
+                    inked     INT        DEFAULT (unixepoch('now')),
                     note      TEXT       NOT NULL,
                     files     TEXT       DEFAULT NULL,
                     crossout  tinyint(1) NOT NULL DEFAULT '0',
@@ -62,6 +61,10 @@ def is_file_img(filename):
     return ext in IMG_EXTS
 app.jinja_env.globals.update(is_file_img=is_file_img)
 
+@app.template_filter('ts')
+def fmt_ts(ts, fmt="%Y-%m-%d"):
+    return dt.datetime.fromtimestamp(ts).strftime(fmt)
+
 # Static files
 @app.route('/<path:path>')
 def serve_static(path):
@@ -69,11 +72,11 @@ def serve_static(path):
 
 # TODO markdown to html files in wiki/
 
-def inc_date(date, val=1):
-    "Increment or decrement date by value given"
-    delta = dt.timedelta(days=val)
-    next_date = dt.date.strptime(date, "%Y-%m-%d") + delta
-    return next_date.strftime("%Y-%m-%d")
+def parse_date(date):
+    try:
+        return parse(date.strip())
+    except (ValueError, AttributeError):
+        return None
 
 # Home page
 @app.route('/<string:sec>/log')
@@ -82,19 +85,20 @@ def logs(sec):
         abort(404)
     num = request.args.get('num', '').strip() # TODO strip leading #
     author = request.args.get('author', '').strip()
-    before = request.args.get('before', '').strip()
-    after = request.args.get('after', '').strip()
+    before = parse_date(request.args.get('before', ''))
+    after = parse_date(request.args.get('after', ''))
     text = request.args.get('q', '').strip()
 
-    today = f"{now():%Y-%m-%d}"
+    today = dt.datetime.now()
+    if not request.args:
+        before = after = today
 
-    if not before and not after:
-        before = today
-        after = today
+    # if before and after and after > before:   # correct for reversed range
+    #     before, after = after, before
 
     # TODO pull out to func
-    query = f"SELECT * FROM log_{sec} WHERE "
     title = "Logs "
+    query = f"SELECT * FROM log_{sec} WHERE "
     params = []
     if num:
         # TODO change to anchor on date
@@ -106,16 +110,19 @@ def logs(sec):
         title += f"by {author} "
         params.append(author)
     if before:
-        query += "date(date) <= ? AND "
-        params.append(before)
+        query += "date < ? AND "
+        end = before.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(1)
+        params.append(int(end.timestamp()))
     if after:
-        query += "date(date) >= ? AND "
-        params.append(after)
+        query += "date >= ? AND "
+        start = after.replace(hour=0, minute=0, second=0, microsecond=0)
+        params.append(int(start.timestamp()))
     if text:
         query += "note LIKE ? AND " # TODO replace with MATCH
         title += f"containing '{text}' "
         params.append(f"%{text}%")
-    query += " 1=1 ORDER BY num ASC"
+    query += " 1=1 ORDER BY num ASC" # TODO ability to order by date
+    # query += " 1=1 ORDER BY date ASC, num ASC"
 
     if before == today and after == today:
         title += f"from Today "
@@ -126,12 +133,11 @@ def logs(sec):
             title += f"to {before} "
 
     rows = get_db().execute(query, params).fetchall()
-    curr_date = now().strftime("%Y-%m-%d")
-    prev_date = inc_date(before or curr_date, -1)
-    next_date = inc_date(after or curr_date, +1)
-    return render_template('index.html', logs=rows, title=title,
+    prev_date = f"{(after or today) - dt.timedelta(1):%Y-%m-%d}"
+    next_date = f"{(before or today) + dt.timedelta(1):%Y-%m-%d}"
+    return render_template('index.html', logs=rows, title=title, # SECTIONS[sec] + title
                            sec=sec, sections=SECTIONS,
-                           curr_date=curr_date, prev_date=prev_date, next_date=next_date)
+                           curr_date=f"{today:%Y-%m-%d}", prev_date=prev_date, next_date=next_date)
 
 def upload_files(sec, files):
     # TODO dont override file of same name
@@ -157,22 +163,19 @@ def log(sec):
     name = request.form['name'].strip() # TODO split into multiple authors
     msg = request.form['message'].strip()
     # TODO only set to now if datetime empty, otherwise error on parse exception
-    try:
-        date = parse(request.form['datetime'].strip())
-    except:
-        date = now()
+    # TODO if no time given replace with current time, not midnight
+    date = parse_date(request.form['datetime']) or dt.datetime.now()
 
     files = upload_files(sec, request.files.getlist("files"))
 
     with get_db() as conn:
-        datestr = f"{date:%Y-%m-%d %H:%M}"
         cur = conn.execute(
             f"INSERT INTO log_{sec} (date, authors, files, note) VALUES (?, ?, ?, ?)",
-            (datestr, name, files, msg),
+            (int(date.timestamp()), name, files, msg),
         )
-        date_no_time = f"{date:%Y-%m-%d}"
+        date_str = f"{date:%Y-%m-%d}"
         # TODO on failure to upload file etc send warning pop up
-        return redirect(f"/{sec}/log?before={date_no_time}&after={date_no_time}#{cur.lastrowid}")
+        return redirect(f"/{sec}/log?before={date_str}&after={date_str}#{cur.lastrowid}")
 
 @app.post('/<string:sec>/crossout/<int:num>')
 def crossout(sec, num):

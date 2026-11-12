@@ -79,7 +79,7 @@
           {%- for log in logs -%}
             <log-entry id="{{log['num']}}">
                 <log-num>
-                    <a href="/{{sec}}/log?before={{ log['date'].split(' ', 1)[0] }}&after={{ log['date'].split(' ', 1)[0] }}#{{ log['num'] }}">
+                    <a href="/{{sec}}/log?before={{ log['date']|ts }}&after={{ log['date']|ts }}#{{ log['num'] }}">
                         #{{ log['num'] }}
                     </a>
                 </log-num>
@@ -87,9 +87,9 @@
                     <log-header>
                         <log-authors>{{ log['authors'] }}</log-authors>
                         <log-datetime>
-                            <a href="/{{sec}}/log?before={{ log['date'].split(' ', 1)[0] }}&after={{ log['date'].split(' ', 1)[0] }}"
-                               title="Submitted: {{ log['submit'] }}">
-                                {{ log['date'] }}
+                            <a href="/{{sec}}/log?before={{ log['date']|ts }}&after={{ log['date']|ts }}"
+                               title="Submitted: {{ log['inked']|ts('%Y-%m-%d %H:%M') }}">
+                                {{ log['date']|ts('%Y-%m-%d %H:%M') }}
                             </a>
                             <button command="show-modal" commandfor="crossout-dialog-{{log['num']}}">✘</button>
                             <dialog id="crossout-dialog-{{log['num']}}">
@@ -142,7 +142,6 @@
                           <input type="text" name="name" id="name" autocomplete="on"
                                  placeholder="Authors" required />
                       </log-authors>
-                      <!-- TODO non current date -->
                       <log-datetime>
                           <input type="text" name="datetime" id="datetime"
                                  autocomplete="on" placeholder="Date-time (optional)" />
