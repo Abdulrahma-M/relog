@@ -1,0 +1,15 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<div align="center">
+    {%- for sec, name in sections.items() -%}
+        <a href="/{{ sec }}/log">
+            <button>
+                {{ name }}
+            </button>
+        </a>
+    {%- endfor -%}
+</div>
+
+{% endblock %}

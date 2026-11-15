@@ -72,6 +72,11 @@ def serve_static(path):
 
 # TODO markdown to html files in wiki/
 
+# Home page
+@app.route('/')
+def home():
+    return render_template('home.html', sections=SECTIONS, title='Pocar Lab Log Book')
+
 def parse_date(date):
     try:
         return parse(date.strip())
@@ -92,7 +97,7 @@ def date_title(before, after, fmt="%Y-%m-%d"):
         return f"from {before:{fmt}} "
     return f"from {after:{fmt}} to {before:{fmt}} "
 
-# Home page
+# Section logs
 @app.route('/<string:sec>/log')
 def logs(sec):
     if sec not in SECTIONS:
@@ -185,6 +190,7 @@ def log(sec):
         # TODO on failure to upload file etc send warning pop up
         return redirect(f"/{sec}/log?before={date_str}&after={date_str}#{cur.lastrowid}")
 
+# Cross out log post number
 @app.post('/<string:sec>/crossout/<int:num>')
 def crossout(sec, num):
     "Mark the given log post as crossed out"
