@@ -1,0 +1,123 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<header>
+    <h1>{{ sections[sec] }} {{ title }}</h1>
+    <a href='/{{sec}}/log?before={{prev_date}}&after={{prev_date}}'>Back</a>
+    <a href='/{{sec}}/log?before={{curr_date}}&after={{curr_date}}'>Today</a>
+    <a href='/{{sec}}/log?before={{next_date}}&after={{next_date}}'>Forward</a>
+</header>
+
+<form action="/{{sec}}/log" method="GET" class="log-search">
+    <input type="search" name="q" id="q" placeholder="Search Logs..." autocomplete="on" />
+    <input type="submit" id="submit" value="Search" autocomplete="on" />
+    <details>
+        <summary>Advanced Search</summary>
+        <log-entry id="search">
+            <log-num>
+                <input type="text" name="num" id="num"
+                        placeholder="Number" autocomplete="on" />
+            </log-num>
+            <log-header>
+                <log-authors>
+                    <input type="text" name="author" id="name"
+                            placeholder="Author" autocomplete="on" />
+                </log-authors>
+                <log-datetime>
+                    <input type="text" name="after" id="after"
+                            placeholder="After Date" autocomplete="on" />
+                    <input type="text" name="before" id="before"
+                            placeholder="Before Date" autocomplete="on" />
+                </log-datetime>
+            </log-header>
+        </log-entry>
+    </details>
+</form>
+
+<log-entries>
+    {%- for log in logs -%}
+    <log-entry id="{{log['num']}}">
+        <log-num>
+            <a href="/{{sec}}/log?before={{ log['date']|ts }}&after={{ log['date']|ts }}#{{ log['num'] }}">
+                #{{ log['num'] }}
+            </a>
+        </log-num>
+        <log-post> <!-- TODO change to details? -->
+            <log-header>
+                <log-authors>{{ log['authors'] }}</log-authors>
+                <log-datetime>
+                    <a href="/{{sec}}/log?before={{ log['date']|ts }}&after={{ log['date']|ts }}"
+                        title="Submitted: {{ log['inked']|ts('%Y-%m-%d %H:%M') }}">
+                        {{ log['date']|ts('%Y-%m-%d %H:%M') }}
+                    </a>
+                    <button command="show-modal" commandfor="crossout-dialog-{{log['num']}}">✘</button>
+                    <dialog id="crossout-dialog-{{log['num']}}">
+                        <p>Are you sure you want to cross out post
+                            #{{ log['num'] }} by {{ log['authors'] }}?</p>
+                        <p>This cannot be undone!</p>
+                        <button commandfor="crossout-dialog-{{log['num']}}" command="close">Cancel</button>
+                        <form action="/{{sec}}/crossout/{{ log['num'] }}" method="post">
+                            <button type="submit">Crossout</button>
+                        </form>
+                    </dialog>
+                </log-datetime>
+            </log-header>
+            <hr>
+            <log-note>
+                <p>
+                    {%- if log['crossout'] -%} <del> {%- endif -%}
+                    {{ log['note'] }}
+                    {%- if log['crossout'] -%} </del> {%- endif -%}
+                </p>
+            </log-note>
+            {%- for file in log['files'].split(':') -%}
+            <!-- TODO save alt text w/ file and display as figure with figure caption -->
+            <!-- TODO label fig as #post.fignum -->
+                {%- if is_file_img(file) -%}
+                    <a href="/upload/{{sec}}/{{ file }}" data-lightbox="{{ log['num'] }}">
+                        <img src="/upload/{{sec}}/{{ file }}" alt="{{ file }}"/>
+                    </a>
+                {%- else -%}
+                    <!-- TODO static image preview for other common file extensions, or generic file for others -->
+                    <a href="/upload/{{sec}}/{{ file }}">
+                        {{ file }}
+                    </a>
+                {%- endif -%}
+            {%- endfor -%}
+        </log-post>
+    </log-entry>
+    {%- endfor -%}
+</log-entries>
+
+<hr style="padding: 2em;">
+
+<form action="/{{sec}}/log" method="post" enctype=multipart/form-data>
+    <log-entry>
+        <log-num><h3>New Log</h3></log-num>
+        <log-post>
+            <log-header>
+                <log-authors>
+                    <!-- TODO value="{{ username }}" -->
+                    <input type="text" name="name" id="name" autocomplete="on"
+                            placeholder="Authors" required />
+                </log-authors>
+                <log-datetime>
+                    <input type="text" name="datetime" id="datetime"
+                            autocomplete="on" placeholder="Date-time (optional)" />
+                </log-datetime>
+            </log-header>
+            <hr>
+            <log-note>
+                <textarea name="message" id="message" rows="7"
+                        placeholder="New log post..." required></textarea>
+                <label for="files" id="attachment">Attachments:
+                    <input type="file" name="files" id="files" multiple />
+                </label>
+                <input type="submit" id="submit" value="Submit" />
+            </log-note>
+        </log-post>
+    </log-entry>
+</form>
+
+{% endblock %}
