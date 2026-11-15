@@ -78,6 +78,20 @@ def parse_date(date):
     except (ValueError, AttributeError):
         return None
 
+def date_title(before, after, fmt="%Y-%m-%d"):
+    if not before and not after:
+        return ""
+    if not before:
+        return f"since {after:{fmt}} "
+    if not after:
+        return f"until {before:{fmt}} "
+    today = dt.datetime.now(before.tzinfo).date()
+    if before.date() == today and after.date() == today:
+        return "from Today "
+    if before.date() == after.date():
+        return f"from {before:{fmt}} "
+    return f"from {after:{fmt}} to {before:{fmt}} "
+
 # Home page
 @app.route('/<string:sec>/log')
 def logs(sec):
@@ -124,13 +138,7 @@ def logs(sec):
     query += " 1=1 ORDER BY num ASC" # TODO ability to order by date
     # query += " 1=1 ORDER BY date ASC, num ASC"
 
-    if before == today and after == today:
-        title += f"from Today "
-    else:
-        if before:
-            title += f"from {after} "
-        if after and not after == before:
-            title += f"to {before} "
+    title += date_title(before, after)
 
     rows = get_db().execute(query, params).fetchall()
     prev_date = f"{(after or today) - dt.timedelta(1):%Y-%m-%d}"
