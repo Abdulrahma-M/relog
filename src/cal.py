@@ -14,7 +14,6 @@ def get_section_counts(conn, year, month, sections):
     counts = {}
 
     for section in sections:
-        print(f"{section=}")
         query = f"""
             SELECT date
             FROM log_{section}
@@ -56,6 +55,7 @@ def cal_gen(conn, year, month, first_weekday, sections):
             day_disp = "&nbsp;" if day == 0 else day
             date_str = f"{year}-{month}-{day}"
             entries_html = ""
+            # TODO sort by number in section
             for sec, sec_name in sections.items():
                 num = counts[sec].get(day, 0)
                 if num > 0:

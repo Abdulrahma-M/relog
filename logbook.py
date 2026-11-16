@@ -1,6 +1,6 @@
 """
 Simple logbook for recording daily lab notes
-Install: pip install flask flask-cors
+Install: pip install -r requirements.txt
 Run:     python logbook.py
 """
 
@@ -14,11 +14,21 @@ import sqlite3
 import markdown
 import os
 import calendar
+from flask_login import LoginManager, login_required
 
 from src.cal import cal_gen
+from src.auth import auth, User
+
 
 app = Flask(__name__, static_folder='static', template_folder="pub")
 CORS(app)  # Allow requests from the HTML file opened locally
+
+app.config['SECRET_KEY'] = 'xenon-forever' # TODO change when deployed
+login_manager = LoginManager()
+login_manager.login_view = 'login'
+login_manager.init_app(app)
+
+app.register_blueprint(auth)
 
 DB_PATH = "logbook.db"
 
@@ -54,6 +64,23 @@ def init_db():
                     crossout  tinyint(1) NOT NULL DEFAULT '0'
                 )
             """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS people (
+                user     TEXT NOT NULL PRIMARY KEY,
+                name     TEXT NOT NULL,
+                email    TEXT NOT NULL,
+                password TEXT NOT NULL,
+                joined   INT  DEFAULT (unixepoch('now')),
+                role     TEXT NOT NULL DEFAULT 'pending'
+            )
+        """)
+
+@login_manager.user_loader
+def load_user(id):
+    with get_db() as conn:
+        user = conn.execute("SELECT * FROM people WHERE user = (?)", [id]).fetchone()
+    return User(user['name'], user['user'], user['email'], user['role'] != 'pending')
+
 
 IMG_EXTS = {'png', 'apng', 'avif', 'jpg', 'jpeg', 'jfif',
             'pjpeg', 'pjp', 'jxl', 'gif', 'svg', 'webp'}
@@ -68,6 +95,7 @@ def fmt_ts(ts, fmt="%Y-%m-%d"):
     return dt.datetime.fromtimestamp(ts).strftime(fmt)
 
 # Static files
+# TODO protect file uploads with @login_required
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('static', path)
@@ -101,6 +129,7 @@ def date_title(before, after, fmt="%Y-%m-%d"):
 
 # Section logs
 @app.route('/<string:sec>/log')
+@login_required
 def logs(sec):
     if sec not in SECTIONS:
         abort(404)
@@ -147,7 +176,8 @@ def logs(sec):
 
     title += date_title(before, after)
 
-    rows = get_db().execute(query, params).fetchall()
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
     prev_date = f"{(after or today) - dt.timedelta(1):%Y-%m-%d}"
     next_date = f"{(before or today) + dt.timedelta(1):%Y-%m-%d}"
     return render_template('log.html', logs=rows, title=SECTIONS[sec] + title,
@@ -172,6 +202,7 @@ def upload_files(sec, files):
 
 # Upload new logbook post
 @app.post('/<string:sec>/log')
+@login_required
 def log(sec):
     if sec not in SECTIONS:
         abort(404)
@@ -194,6 +225,7 @@ def log(sec):
 
 # Cross out log post number
 @app.post('/<string:sec>/crossout/<int:num>')
+@login_required
 def crossout(sec, num):
     "Mark the given log post as crossed out"
     if sec not in SECTIONS:
