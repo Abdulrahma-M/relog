@@ -4,7 +4,7 @@ Install: pip install flask flask-cors
 Run:     python logbook.py
 """
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, redirect
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, abort
 from werkzeug.utils import secure_filename
 from markupsafe import escape
 from flask_cors import CORS
@@ -49,7 +49,7 @@ def init_db():
                     inked     INT        DEFAULT (unixepoch('now')),
                     note      TEXT       NOT NULL,
                     files     TEXT       DEFAULT NULL,
-                    crossout  tinyint(1) NOT NULL DEFAULT '0',
+                    crossout  tinyint(1) NOT NULL DEFAULT '0'
                 )
             """)
 
