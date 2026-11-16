@@ -1,0 +1,34 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<header>
+    <h1>{{ title }}</h1>
+
+    <a href='/cal?year={{prev.year}}&month={{prev.month}}'>Back</a>
+    <a href='/cal?year={{curr.year}}&month={{curr.month}}'>Today</a>
+    <a href='/cal?year={{next.year}}&month={{next.month}}'>Forward</a>
+
+</header>
+
+<div align='center'>
+    {{ cal }}
+</div>
+
+<style>
+ table {
+     table-layout: fixed;
+     width: 100%;
+ }
+ table a[href] {
+     color: var(--cfg);
+     text-decoration: none;
+ }
+ table ul {
+     list-style-type: none; /* remove bullets */
+     padding: 0;
+     margin: 0;
+ }
+</style>
+
+{% endblock %}

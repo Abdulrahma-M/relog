@@ -6,14 +6,16 @@ Run:     python logbook.py
 
 from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, abort
 from werkzeug.utils import secure_filename
-from markupsafe import escape
+from markupsafe import escape, Markup
 from flask_cors import CORS
 import datetime as dt
 from dateutil.parser import parse
 import sqlite3
 import markdown
 import os
+import calendar
 
+from src.cal import cal_gen
 
 app = Flask(__name__, static_folder='static', template_folder="pub")
 CORS(app)  # Allow requests from the HTML file opened locally
@@ -201,6 +203,41 @@ def crossout(sec, num):
     target = request.referrer or f'/?num={num}'
     return redirect(f"{target}#{num}")
 
+FIRST_WEEKDAY = 6 # Sunday
+
+@app.route('/cal')
+def cal():
+    year = request.args.get("year", default=dt.datetime.now().year, type=int)
+    month = request.args.get("month", default=dt.datetime.now().month, type=int)
+
+    title = f"Calendar for {calendar.month_name[month]} {year}"
+
+    # day_offset = datetime.date(year, month, 1).weekday() - FIRST_WEEKDAY
+
+    with get_db() as conn:
+        cal_html = cal_gen(conn, year, month, FIRST_WEEKDAY, SECTIONS)
+
+    curr = {
+        'year': dt.datetime.now().year,
+        'month': dt.datetime.now().month
+    }
+    prev = {
+        'year': year - 1 if month == 1 else year,
+        'month': month - 1 or 12,
+    }
+    next = {
+        'year': year + 1 if month == 12 else year,
+        'month': month + 1 if month < 12 else 1
+    }
+
+    return render_template('cal.html',
+                           cal=Markup(cal_html),
+                           title=title,
+                           sections=SECTIONS,
+                           next=next,
+                           prev=prev,
+                           curr=curr,
+                           )
 
 if __name__ == "__main__":
     init_db()
